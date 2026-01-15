@@ -2,7 +2,7 @@
 source:
   host: 172.18.144.1
   port: 5432
-  database: panelx
+  database: test
   user: postgres
   password: postgres
   schema: public
@@ -11,11 +11,11 @@ source:
 
 # OceanBase 目标端配置（MySQL 租户）
 target:
-  host: 183.6.70.7
+  host: 172.18.144.1
   port: 2881
   database: test
   user: root@test
-  password: kwaidoo123
+  password: test_pass
   mode: mysql
   pool_size: 10
   max_overflow: 20
