@@ -1,0 +1,30 @@
+# PostgreSQL 驱动
+psycopg2-binary==2.9.9
+
+# OceanBase MySQL 驱动
+pymysql==1.1.0
+DBUtils==3.1.2
+
+# 配置管理
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# 进度和日志
+tqdm==4.66.1
+loguru==0.7.2
+
+# 工具库
+pandas==2.1.4
+numpy==1.26.2
+
+# 类型转换
+pydantic==2.5.2
+
+# 测试框架
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# 代码质量
+ruff==0.1.9
+black==23.12.1
+mypy==1.7.1

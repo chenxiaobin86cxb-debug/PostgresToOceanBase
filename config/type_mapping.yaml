@@ -1,0 +1,21 @@
+# PostgreSQL 到 OceanBase MySQL 租户类型映射
+postgres_to_mysql:
+  smallint: SMALLINT
+  integer: INT
+  bigint: BIGINT
+  serial: INT AUTO_INCREMENT
+  bigserial: BIGINT AUTO_INCREMENT
+  decimal: DECIMAL({precision},{scale})
+  numeric: DECIMAL({precision},{scale})
+  real: FLOAT
+  double precision: DOUBLE
+  boolean: TINYINT(1)
+  char: CHAR({length})
+  varchar: VARCHAR({length})
+  text: LONGTEXT
+  bytea: VARBINARY(65535)
+  date: DATE
+  timestamp: TIMESTAMP
+  timestamptz: TIMESTAMP
+  uuid: VARCHAR(36)
+  enum: VARCHAR(255)

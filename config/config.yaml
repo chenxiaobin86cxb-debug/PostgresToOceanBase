@@ -1,0 +1,58 @@
+# PostgreSQL 源端配置
+source:
+  host: 172.18.144.1
+  port: 5432
+  database: panelx
+  user: postgres
+  password: postgres
+  schema: public
+  pool_size: 10
+  max_overflow: 20
+
+# OceanBase 目标端配置（MySQL 租户）
+target:
+  host: 183.6.70.7
+  port: 2881
+  database: test
+  user: root@test
+  password: kwaidoo123
+  mode: mysql
+  pool_size: 10
+  max_overflow: 20
+
+# 迁移配置
+migration:
+  # 表结构迁移
+  schema:
+    enabled: true
+    ignore_types: ['json', 'jsonb', 'array']  # 忽略的数据类型
+    include_tables: []    # 空表示所有表，否则指定表名列表
+    exclude_tables: []    # 排除的表名列表
+
+  # 数据迁移
+  data:
+    enabled: true
+    batch_size: 1000      # 批量插入大小
+    parallel_workers: 4   # 并发工作数
+    chunk_size: 10000     # 每次读取的记录数
+    progress_interval: 10 # 进度显示间隔（秒）
+
+  # 数据验证
+  validation:
+    enabled: true
+    sample_size: 1000     # 抽样验证数量
+    check_count: true      # 检查记录数
+    check_checksum: true   # 检查校验和
+
+  # 错误处理
+  error:
+    max_retries: 3        # 最大重试次数
+    retry_delay: 5        # 重试延迟（秒）
+    continue_on_error: false  # 出错后是否继续
+
+# 日志配置
+logging:
+  level: INFO
+  file: logs/migration.log
+  rotation: 100 MB
+  retention: 30 days

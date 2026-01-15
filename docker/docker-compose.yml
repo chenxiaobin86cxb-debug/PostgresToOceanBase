@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  migration:
+    build: .
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./backup:/app/backup
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - OCEANBASE_PASSWORD=${OCEANBASE_PASSWORD}
+    depends_on:
+      - postgres
+      - oceanbase
