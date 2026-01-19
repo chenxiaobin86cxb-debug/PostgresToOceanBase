@@ -32,6 +32,22 @@ class OceanBaseClient:
             finally:
                 cursor.close()
 
+    def create_index(self, index_sql: str) -> bool:
+        """创建索引"""
+        with self.conn_mgr.get_target_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(index_sql)
+                conn.commit()
+                logger.info(f"索引创建成功: {index_sql[:50]}...")
+                return True
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"索引创建失败: {e}")
+                return False
+            finally:
+                cursor.close()
+
     def insert_batch(self, table_name: str, data: List[Dict],
                     batch_size: int = 1000) -> int:
         """批量插入数据"""

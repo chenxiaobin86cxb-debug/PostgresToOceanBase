@@ -104,3 +104,43 @@ class PostgreSQLClient:
             rows = [dict(row) for row in cursor.fetchall()]
             cursor.close()
             return rows
+
+    def get_table_indexes(self, table_name: str, schema: str = 'public') -> List[Dict]:
+        """获取表索引信息（不含主键）"""
+        with self.conn_mgr.get_source_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    i.relname AS index_name,
+                    ix.indisunique AS is_unique,
+                    ord.ordinality AS position,
+                    a.attname AS column_name
+                FROM pg_index ix
+                JOIN pg_class t ON t.oid = ix.indrelid
+                JOIN pg_class i ON i.oid = ix.indexrelid
+                JOIN pg_namespace ns ON ns.oid = t.relnamespace
+                JOIN unnest(ix.indkey) WITH ORDINALITY AS ord(attnum, ordinality)
+                  ON ord.attnum > 0
+                JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ord.attnum
+                WHERE ns.nspname = %s
+                  AND t.relname = %s
+                  AND NOT ix.indisprimary
+                ORDER BY index_name, position
+                """,
+                (schema, table_name)
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+
+        indexes_map = {}
+        for index_name, is_unique, _, column_name in rows:
+            if index_name not in indexes_map:
+                indexes_map[index_name] = {
+                    'index_name': index_name,
+                    'is_unique': is_unique,
+                    'columns': []
+                }
+            indexes_map[index_name]['columns'].append(column_name)
+
+        return list(indexes_map.values())

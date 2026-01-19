@@ -41,7 +41,7 @@ COPY (
   DELIMITER ',',
   NULL '\N',
   QUOTE '"',
-  ESCAPE '"',
+  ESCAPE '\\',
   HEADER false
 );
 ```
@@ -54,6 +54,34 @@ COPY (
 python scripts/export_to_tsv.py --config config/config.yaml --output-dir export
 ```
 
+如需批量创建表结构，可先导出 SQL，再在 OceanBase 侧一次性执行：
+
+```bash
+python scripts/export_schema_sql.py --config config/config.yaml \
+  --output-file export/schema.sql --include-indexes
+```
+
+执行导出的 SQL：
+
+```bash
+python scripts/apply_schema_sql.py --config config/config.yaml \
+  --sql-file export/schema.sql
+```
+
+若重复执行导致索引已存在，可加参数跳过重复索引错误：
+
+```bash
+python scripts/apply_schema_sql.py --config config/config.yaml \
+  --sql-file export/schema.sql --skip-duplicate-index
+```
+
+如需校验 bytea 十六进制数据格式（无 `\\x` 前缀、偶数长度、仅 0-9a-f）：
+
+```bash
+python scripts/validate_hex_export.py --config config/config.yaml \
+  --table your_table --file /path/to/your_table.csv
+```
+
 ### 建议的预处理规则
 
 - 布尔：`true/false` -> `1/0`
@@ -61,16 +89,17 @@ python scripts/export_to_tsv.py --config config/config.yaml --output-dir export
 - JSON/JSONB/数组字段：不导出（已忽略）
 - 超长字符：确保目标列类型为 `TEXT/LONGTEXT`
 - NULL：统一为 `\N`
+- bytea：导出为十六进制字符串（不包含 `\\x` 前缀），目标列建议使用 `LONGBLOB`
 
 ## 导入方式（OceanBase）
 
 ### 使用 obloader（推荐）
 
-适合超大规模文件导入，支持多线程、断点续传。建议用 TSV（tab 分隔）并显式配置 NULL、分隔符、目标表等。
+适合超大规模文件导入，支持多线程、断点续传。建议用 CSV 并显式配置 NULL、分隔符、目标表等。
 
 **步骤概览**
 
-1. 为每个表准备 TSV 文件（可按主键区间分片）
+1. 为每个表准备 CSV 文件（可按主键区间分片）
 2. 编写 obloader 配置（目标库连接、文件路径、分隔符、NULL 表示、并发）
 3. 执行 obloader 导入
 4. 根据覆盖策略选择 REPLACE/UPSERT 或先导入临时表再合并
@@ -79,7 +108,7 @@ python scripts/export_to_tsv.py --config config/config.yaml --output-dir export
 
 - 目标库连接：host/port/user/password/database
 - 文件路径与表映射
-- 文件格式：CSV（字段分隔符 `,`，NULL 为 `\N`）
+- 文件格式：CSV（字段分隔符 `,`，NULL 为 `\N`，转义为 `\\`）
 - 并发参数：并发 worker、批大小
 - 覆盖策略：replace / upsert / truncate + load
 
@@ -89,6 +118,7 @@ python scripts/export_to_tsv.py --config config/config.yaml --output-dir export
 obloader -h <host> -P <port> -u <user> -t <tenant> -c <cluster> -p <password> -D <database> \
   --csv --file-encoding=UTF-8 --character-set=utf8mb4 \
   --column-separator=, --line-separator=$'\n' --null-string='\\N' \
+  --column-quote='"' --escape-character='\\' \
   --file-suffix=.csv --thread=8 -f /path/to/csv_dir
 ```
 
@@ -102,7 +132,7 @@ INTO TABLE test_users
 CHARACTER SET utf8mb4
 FIELDS TERMINATED BY ','
 OPTIONALLY ENCLOSED BY '"'
-ESCAPED BY '"'
+ESCAPED BY '\\'
 LINES TERMINATED BY '\n'
 (@id, @name, @is_active, @created_at)
 SET

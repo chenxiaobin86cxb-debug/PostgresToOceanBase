@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from loguru import logger
 from src.migration.converter import TypeConverter
 
@@ -42,7 +42,8 @@ class SchemaMigrator:
 
         return expr
 
-    def generate_create_table_sql(self, schema: Dict, ignore_types: List[str]) -> str:
+    def generate_create_table_sql(self, schema: Dict,
+                                  ignore_types: List[str]) -> Tuple[str, List[str]]:
         """生成 CREATE TABLE SQL"""
         table_name = schema['table_name']
         columns = schema['columns']
@@ -107,7 +108,15 @@ class SchemaMigrator:
         sql += primary_key_def
         sql += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 
-        return sql
+        return sql, ignored_columns
+
+    def _generate_create_index_sql(self, table_name: str, index_name: str,
+                                   columns: List[str], is_unique: bool) -> str:
+        quoted_table = self._quote_identifier(table_name)
+        quoted_index = self._quote_identifier(index_name)
+        columns_str = ', '.join(self._quote_identifier(col) for col in columns)
+        unique = 'UNIQUE ' if is_unique else ''
+        return f"CREATE {unique}INDEX {quoted_index} ON {quoted_table} ({columns_str});"
 
     def migrate_schema(self, tables: List[str], schema: str = 'public',
                       ignore_types: List[str] = None) -> Dict:
@@ -118,7 +127,8 @@ class SchemaMigrator:
         results = {
             'success': [],
             'failed': [],
-            'ignored_columns': {}
+            'ignored_columns': {},
+            'indexes_failed': []
         }
 
         for table_name in tables:
@@ -127,7 +137,10 @@ class SchemaMigrator:
                 pg_schema = self.pg_client.get_table_schema(table_name, schema)
 
                 # 生成 CREATE TABLE SQL
-                create_sql = self.generate_create_table_sql(pg_schema, ignore_types)
+                create_sql, ignored_columns = self.generate_create_table_sql(
+                    pg_schema, ignore_types
+                )
+                results['ignored_columns'][table_name] = ignored_columns
 
                 # 创建表
                 success = self.ob_client.create_table(create_sql)
@@ -135,6 +148,30 @@ class SchemaMigrator:
                 if success:
                     results['success'].append(table_name)
                     logger.info(f"表结构迁移成功: {table_name}")
+
+                    # 创建索引（不含主键）
+                    indexes = self.pg_client.get_table_indexes(table_name, schema)
+                    for index_info in indexes:
+                        index_columns = index_info['columns']
+                        if any(col in ignored_columns for col in index_columns):
+                            logger.warning(
+                                f"索引包含忽略字段，跳过: {table_name}."
+                                f"{index_info['index_name']}"
+                            )
+                            continue
+
+                        index_sql = self._generate_create_index_sql(
+                            table_name,
+                            index_info['index_name'],
+                            index_columns,
+                            index_info['is_unique']
+                        )
+                        index_success = self.ob_client.create_index(index_sql)
+                        if not index_success:
+                            results['indexes_failed'].append({
+                                'table_name': table_name,
+                                'index_name': index_info['index_name']
+                            })
                 else:
                     results['failed'].append(table_name)
                     logger.error(f"表结构迁移失败: {table_name}")

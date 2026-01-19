@@ -2,274 +2,299 @@
 
 ## 项目概述
 
-PostgreSQL 到 OceanBase 迁移工具，用于全量数据迁移，自动忽略 JSON/JSONB 和数组类型字段。
+PostgreSQL 到 OceanBase 迁移工具，专注于**全量数据迁移**和**停机迁移**策略。该工具自动忽略 `JSON/JSONB` 和 `数组` 类型字段，确保核心业务数据平滑迁移至 OceanBase MySQL 租户。
 
-## 构建命令
+## 核心能力
+- **全量迁移**：支持表结构 + 索引 + 数据的完整迁移，自动忽略 JSON/JSONB 和数组类型字段。
+- **增量迁移**：支持仅调整表结构和索引，通过模型比对生成差异报告，实现最小化变更。
+- **高性能数据迁移**：支持批量插入、并发处理和流式读取。
+- **智能字段过滤**：根据配置自动跳过不支持或不需要的复杂数据类型。
+- **完整性校验**：提供记录数、抽样 MD5 和汇总值多维度验证。
 
+---
+
+## 构建与测试
+
+### 快速开始
 ```bash
-# 创建虚拟环境
+# 1. 创建并激活虚拟环境
 python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate  # Windows
+source venv/bin/activate
 
-# 安装依赖
+# 2. 安装依赖
 pip install -r requirements.txt
 
-# 运行完整迁移（表结构 + 数据 + 验证）
+# 3. 配置环境变量
+cp .env.example .env  # 编辑 .env 设置密码
+
+# 4. 运行迁移（表结构 + 数据 + 验证）
 python src/main.py --config config/config.yaml --validate
-
-# 仅迁移表结构
-python src/main.py --config config/config.yaml --schema-only
-
-# 仅迁移数据
-python src/main.py --config config/config.yaml --data-only
-
-# Docker 构建
-docker build -t postgres2ob:latest .
-docker-compose up -d
 ```
 
-## 测试命令
-
+### 测试命令
 ```bash
 # 运行所有测试
 pytest tests/
 
 # 运行单个测试文件
-pytest tests/test_converter.py
+pytest tests/test_converter.py -v
 
 # 运行特定测试函数
-pytest tests/test_converter.py::test_convert_boolean
+pytest tests/test_converter.py::test_convert_boolean -v
 
-# 显示详细输出
-pytest -v tests/
-
-# 生成覆盖率报告
+# 运行测试并生成覆盖率报告
 pytest --cov=src --cov-report=html tests/
+
+# 查看覆盖率报告
+open htmlcov/index.html  # Mac
+xdg-open htmlcov/index.html  # Linux
 ```
 
-## Lint 和格式化
-
+### 代码质量命令
 ```bash
-# 代码风格检查（推荐使用 ruff）
+# 代码风格检查
 ruff check src/
 
-# 自动修复问题
+# 自动修复 lint 错误
 ruff check --fix src/
 
-# 格式化代码（使用 black）
+# 格式化代码
 black src/ tests/
 
-# 类型检查（使用 mypy）
+# 类型检查
 mypy src/ --ignore-missing-imports
 ```
 
-## 代码风格指南
+### 运行命令
+| 命令 | 说明 |
+|------|------|
+| `python src/main.py --config config/config.yaml --validate` | 完整迁移（表结构 + 数据 + 验证） |
+| `python src/main.py --schema-only` | 仅迁移表结构（含字段过滤） |
+| `python src/main.py --data-only` | 仅迁移存量数据 |
+| `python src/main.py --validate` | 迁移完成后执行一致性校验 |
+
+---
+
+## 代码风格规范
 
 ### 导入顺序
-
-1. 标准库导入
-2. 第三方库导入
-3. 本项目导入
-4. 各部分之间空一行
-
 ```python
-import logging
-from typing import List, Dict, Optional
+# 1. 标准库
+import os
+import sys
+from typing import Dict, List, Optional
 
+# 2. 第三方库
 import yaml
 from loguru import logger
+import psycopg2
+import pymysql
 
+# 3. 本地模块
 from src.database.connection import ConnectionManager
 from src.migration.converter import TypeConverter
 ```
 
+### 命名约定
+- **类名**: PascalCase（如 `TypeConverter`, `PostgreSQLClient`, `DataMigrator`）
+- **函数/变量**: snake_case（如 `convert_value`, `get_table_count`, `batch_size`）
+- **私有方法**: 前缀 `_`（如 `_quote_identifier`, `_normalize_default`）
+- **常量**: UPPER_SNAKE_CASE（如 `MAX_RETRIES`, `DEFAULT_BATCH_SIZE`）
+
 ### 类型注解
-
-- 所有函数必须使用类型注解
-- 复杂类型使用 typing 模块
-- 类属性使用类型提示
-
+所有函数必须包含类型注解：
 ```python
-from typing import List, Dict, Any, Optional
-
-def get_tables(self, schema: str = 'public') -> List[str]:
-    pass
-
 def convert_column_type(self, postgres_type: str, column_info: Dict) -> str:
+    """转换列类型"""
     pass
 
-class ConnectionManager:
-    def __init__(self, config: dict):
-        self.source_config: dict = config.get('source', {})
-        self.source_pool: Optional[pg_pool.ThreadedConnectionPool] = None
+def get_table_data(self, table_name: str, schema: str = 'public',
+                  offset: int = 0, limit: int = 1000) -> List[Dict]:
+    """获取表数据"""
+    pass
 ```
 
-### 命名约定
+### 文档字符串
+使用中文文档字符串，遵循 Google 风格：
+```python
+def should_ignore_column(self, column_info: Dict, ignore_types: List[str]) -> bool:
+    """判断是否应该忽略该列
 
-- 类名：PascalCase（如 ConnectionManager）
-- 函数/变量名：snake_case（如 get_table_count）
-- 常量：UPPER_SNAKE_CASE（如 MAX_RETRIES）
-- 私有方法/属性：_leading_underscore
+    Args:
+        column_info: 列信息字典，包含 data_type 和 udt_name
+        ignore_types: 需要忽略的类型列表
+
+    Returns:
+        bool: 如果应该忽略返回 True，否则返回 False
+    """
+    pass
+```
 
 ### 错误处理
-
-- 使用 try-except 捕获异常
-- 记录错误日志（使用 loguru.logger）
-- 资源清理放在 finally 中
-- 连接使用 contextmanager
-
 ```python
-@contextmanager
-def get_source_connection(self):
-    conn = None
-    try:
-        conn = self.source_pool.getconn()
-        yield conn
-    except Exception as e:
-        logger.error(f"PostgreSQL 连接错误: {e}")
-        if conn:
+# 数据库操作必须使用 try/except/finally
+def create_table(self, schema_sql: str) -> bool:
+    """创建表"""
+    with self.conn_mgr.get_target_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(schema_sql)
+            conn.commit()
+            logger.info(f"表创建成功: {schema_sql[:50]}...")
+            return True
+        except Exception as e:
             conn.rollback()
-        raise
-    finally:
-        if conn:
-            self.source_pool.putconn(conn)
+            logger.error(f"表创建失败: {e}")
+            return False
+        finally:
+            cursor.close()
+
+# 使用重试装饰器处理瞬态故障
+from src.utils.retry import retry
+
+@retry(max_retries=3, delay=5, backoff=1.0)
+def safe_insert(self, table, batch):
+    """带重试的安全插入"""
+    pass
+```
+
+### 数据库操作规范
+```python
+# 1. 必须使用上下文管理器（with 语句）
+with self.conn_mgr.get_source_connection() as conn:
+    cursor = conn.cursor()
+    # 操作
+    cursor.close()
+
+# 2. 关闭游标（finally 块）
+try:
+    cursor.execute(sql)
+    conn.commit()
+finally:
+    cursor.close()
+
+# 3. 批量插入使用 executemany
+cursor.executemany(sql, values)
+conn.commit()
+
+# 4. OceanBase/MySQL 标识符必须加反引号
+@staticmethod
+def _quote_identifier(name: str) -> str:
+    escaped = name.replace('`', '``')
+    return f"`{escaped}`"
+
+# 5. 批量大小推荐 1000-5000
+batch_size = 1000  # 或根据数据量调整
 ```
 
 ### 日志规范
-
-- 使用 loguru.logger（不使用标准 logging）
-- 关键操作：logger.info()
-- 成功完成：logger.info(f"操作成功: {table_name}")
-- 失败错误：logger.error(f"操作失败: {table_name}, 错误: {e}")
-- 警告信息：logger.warning(f"警告信息: {detail}")
-
-### 配置管理
-
-- 使用 YAML 配置文件
-- 敏感信息通过环境变量
-- 使用 pydantic 数据验证
-- 配置文件位置：config/
-
 ```python
-def load_config(config_file: str = 'config/config.yaml') -> dict:
-    with open(config_file, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-    logger.info(f"配置文件加载成功: {config_file}")
-    return config
+from loguru import logger
+
+# 信息日志
+logger.info(f"配置文件加载成功: {config_file}")
+
+# 警告日志
+logger.warning(f"表 {table_name} 将忽略字段: {ignored_cols}")
+
+# 错误日志
+logger.error(f"表创建失败: {e}")
 ```
 
-### 数据库操作
-
-- 使用连接池管理连接
-- 批量操作使用 executemany
-- 分批读取大表数据
-- 事务手动提交或回滚
-
+### 测试规范
 ```python
-def insert_batch(self, table_name: str, data: List[Dict], batch_size: int = 1000):
-    for i in range(0, len(data), batch_size):
-        batch = data[i:i + batch_size]
-        cursor.executemany(sql, values)
-        conn.commit()
+import pytest
+from unittest.mock import Mock
+
+# 使用 Fixture
+@pytest.fixture
+def mock_pg_client():
+    client = Mock()
+    client.get_table_schema.return_value = {...}
+    return client
+
+# 测试命名: test_<function_name>
+def test_convert_boolean():
+    converter = TypeConverter('config/type_mapping.yaml')
+    assert converter.convert_value(True, 'boolean') == 1
+    assert converter.convert_value(False, 'boolean') == 0
+
+# 测试成功和失败路径
+def test_migrate_schema_success(mock_pg_client, mock_ob_client, converter):
+    migrator = SchemaMigrator(mock_pg_client, mock_ob_client, converter)
+    results = migrator.migrate_schema(tables, 'public', ['json'])
+    assert len(results['success']) == 1
 ```
 
-### 重试机制
+---
 
-- 网络操作和数据库操作支持重试
-- 使用装饰器实现重试逻辑
-- 记录重试次数
+## 核心模块规范
 
+### 1. 字段忽略逻辑 (`src/migration/converter.py`)
+在转换过程中，必须显式检查字段类型。如果属于 `ignore_types`，则应从 DDL 生成和数据读取中剔除。
+```python
+def should_ignore_column(self, column_info: Dict, ignore_types: List[str]) -> bool:
+    data_type = column_info.get('data_type', '').lower()
+    udt_name = column_info.get('udt_name', '').lower()
+    return any(t in data_type or t in udt_name for t in ignore_types)
+```
+
+### 2. 批量插入优化 (`src/database/oceanbase.py`)
+使用 `executemany` 配合连接池，设置合理的 `batch_size`（推荐 1000-5000）。
+```python
+cursor.executemany(sql, values)
+conn.commit()
+```
+
+### 3. 错误处理与重试
+对网络波动和数据库临时锁竞争应具备重试机制。
 ```python
 @retry(max_retries=3, delay=5)
-def insert_data(self, table_name: str, data: List[Dict]):
+def safe_insert(self, table, batch):
+    # 实现插入逻辑
     pass
 ```
 
-### 进度显示
+---
 
-- 使用 tqdm 显示进度条
-- 批量操作显示进度
-- 实时更新进度信息
+## 迁移检查清单
 
-```python
-from tqdm import tqdm
+### 迁移前准备
+- [ ] **备份**：完成 PostgreSQL 源数据库的全量物理/逻辑备份。
+- [ ] **权限**：确保迁移账号具备 `SELECT` (源端) 和 `CREATE/INSERT/UPDATE` (目标端) 权限。
+- [ ] **空间**：OceanBase 磁盘空间需预留源端的 1.5-2 倍。
+- [ ] **服务停机**：确认应用已停止写入 PostgreSQL。
 
-pbar = tqdm(total=total_count, desc=f"Migrating {table_name}")
-for batch in batches:
-    process(batch)
-    pbar.update(len(batch))
-pbar.close()
-```
+### 迁移中监控
+- [ ] **日志**：观察 `logs/migration.log` 是否有 `ERROR` 级别报错。
+- [ ] **进度**：通过 `tqdm` 进度条监控大表迁移时效。
+- [ ] **负载**：监控 OceanBase 的 CPU 和 IOPS，避免写入压垮租户。
 
-### 数据类型转换
+### 迁移后验证
+- [ ] **记录数**：比对 PG 和 OB 的 `COUNT(*)` 结果。
+- [ ] **抽样比对**：对前 1000 条数据进行校验。
+- [ ] **应用测试**：启动测试环境应用验证核心功能。
 
-- PostgreSQL 类型转换为 OceanBase MySQL 类型
-- 类型映射配置在 config/type_mapping.yaml
-- 特殊类型处理：BOOLEAN → TINYINT(1), TIMESTAMP WITH TIME ZONE → TIMESTAMP
+---
 
-### 忽略字段
+## 重要约束与风险
 
-- JSON/JSONB 类型自动忽略
-- 数组类型自动忽略
-- 在 config.yaml 中配置 ignore_types
+1. **类型丢失**：`JSON/JSONB` 和 `数组` 字段将被完全忽略，不进行迁移。
+2. **时区转换**：`TIMESTAMP WITH TIME ZONE` 将转换为普通 `TIMESTAMP`，时区信息会丢失。
+3. **布尔处理**：`BOOLEAN` 转换为 `TINYINT(1)`，应用层需处理 0/1 到 True/False 的映射。
+4. **不可回退操作**：在 OceanBase 上执行 `TRUNCATE` 或 `DROP` 操作是不可逆的。
+5. **回退策略**：若迁移失败且数据损坏，应立即清空 OB 表并切回 PG，重新评估方案。
 
-### 文档注释
-
-- 类和主要方法添加文档字符串
-- 复杂逻辑添加中文注释
-- 配置项说明使用注释
-
-```python
-class PostgreSQLClient:
-    """PostgreSQL 客户端"""
-
-    def get_table_schema(self, table_name: str, schema: str = 'public') -> Dict[str, Any]:
-        """获取表结构"""
-        pass
-```
+---
 
 ## 项目结构
-
-```
+```text
 PostgresToOceanBase/
-├── config/              # 配置文件目录
-│   ├── config.yaml      # 主配置文件
-│   ├── type_mapping.yaml # 数据类型映射
-│   └── logger.yaml      # 日志配置
-├── src/                 # 源代码目录
-│   ├── database/        # 数据库模块
-│   │   ├── postgres.py  # PostgreSQL 客户端
-│   │   ├── oceanbase.py # OceanBase 客户端
-│   │   └── connection.py # 连接池管理
-│   ├── migration/        # 迁移模块
-│   │   ├── schema.py    # 表结构迁移
-│   │   ├── data.py      # 数据迁移
-│   │   ├── validator.py # 数据验证
-│   │   └── converter.py # 类型转换
-│   ├── utils/           # 工具模块
-│   │   ├── logger.py    # 日志工具
-│   │   ├── progress.py  # 进度显示
-│   │   └── retry.py     # 重试机制
-│   └── main.py          # 主程序入口
-├── tests/               # 测试文件
-│   ├── test_converter.py
-│   ├── test_schema.py
-│   └── test_data.py
-├── logs/                # 日志目录
-├── backup/              # 备份目录
-├── .env                 # 环境变量
-├── .gitignore
-├── requirements.txt
-├── setup.py
-└── README.md
+├── config/              # 配置文件 (config.yaml, type_mapping.yaml)
+├── src/
+│   ├── database/        # 数据库客户端 (postgres.py, oceanbase.py)
+│   ├── migration/       # 迁移逻辑 (schema.py, data.py, converter.py)
+│   └── utils/           # 工具类 (logger.py, retry.py)
+├── tests/               # 单元测试与集成测试
+└── backup/              # 存放迁移过程中的检查点文件
 ```
-
-## 重要约束
-
-1. 忽略 JSON/JSONB 类型字段
-2. 忽略数组类型字段
-3. OceanBase 使用 MySQL 租户模式
-4. 统一使用 UTF-8 字符集
-5. 连接使用连接池
-6. 迁移前必须备份源数据库

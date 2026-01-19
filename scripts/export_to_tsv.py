@@ -55,6 +55,8 @@ def _build_select_columns(columns: Sequence[Dict], ignore_types: List[str]) -> T
             )
         elif data_type == 'date':
             expr = f"to_char({quoted_col}, 'YYYY-MM-DD') AS {quoted_col}"
+        elif data_type == 'bytea':
+            expr = f"encode({quoted_col}, 'hex') AS {quoted_col}"
         else:
             expr = quoted_col
 
@@ -152,7 +154,7 @@ def main() -> None:
     parser.add_argument('--delimiter', default=',', help='字段分隔符（默认逗号）')
     parser.add_argument('--null-string', default='\\N', help='NULL 替代字符')
     parser.add_argument('--quote', default='"', help='引号字符')
-    parser.add_argument('--escape', default='"', help='转义字符')
+    parser.add_argument('--escape', default='\\', help='转义字符')
     args = parser.parse_args()
 
     config = load_config(args.config)

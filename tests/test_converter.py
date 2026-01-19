@@ -43,6 +43,7 @@ def test_convert_column_type():
     assert converter.convert_column_type('integer', {}) == 'INT'
     assert converter.convert_column_type('boolean', {}) == 'TINYINT(1)'
     assert converter.convert_column_type('text', {}) == 'LONGTEXT'
+    assert converter.convert_column_type('bytea', {}) == 'LONGBLOB'
 
     # 带精度的类型转换
     decimal_info = {'numeric_precision': 10, 'numeric_scale': 2}

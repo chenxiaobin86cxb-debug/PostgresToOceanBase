@@ -33,6 +33,7 @@ def mock_pg_client():
         ],
         'primary_keys': ['id']
     }
+    client.get_table_indexes.return_value = []
     return client
 
 
@@ -74,7 +75,7 @@ def test_generate_create_table_sql(mock_pg_client, mock_ob_client, converter):
         'primary_keys': ['id']
     }
 
-    sql = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
+    sql, _ = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
 
     assert 'CREATE TABLE IF NOT EXISTS `test_table`' in sql
     assert '`id` INT NOT NULL' in sql
@@ -106,7 +107,7 @@ def test_generate_create_table_sql_with_ignored_columns(mock_pg_client, mock_ob_
         'primary_keys': ['id']
     }
 
-    sql = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
+    sql, _ = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
 
     # JSONB 字段应该被忽略
     assert 'data' not in sql
@@ -130,7 +131,7 @@ def test_generate_create_table_sql_with_sequence_default(mock_pg_client, mock_ob
         'primary_keys': ['id']
     }
 
-    sql = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
+    sql, _ = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
 
     assert 'AUTO_INCREMENT' in sql
     assert 'nextval' not in sql
@@ -154,7 +155,7 @@ def test_generate_create_table_sql_with_cast_default(mock_pg_client, mock_ob_cli
         'primary_keys': []
     }
 
-    sql = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
+    sql, _ = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
 
     assert "DEFAULT 'pending'" in sql
     assert '::character varying' not in sql
@@ -177,7 +178,7 @@ def test_generate_create_table_sql_with_boolean_default(mock_pg_client, mock_ob_
         'primary_keys': []
     }
 
-    sql = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
+    sql, _ = migrator.generate_create_table_sql(schema, ['json', 'jsonb', 'array'])
 
     assert 'DEFAULT 1' in sql
 
@@ -193,6 +194,7 @@ def test_migrate_schema_success(mock_pg_client, mock_ob_client, converter):
     assert results['success'][0] == 'test_table'
     assert len(results['failed']) == 0
     mock_ob_client.create_table.assert_called_once()
+    mock_pg_client.get_table_indexes.assert_called_once()
 
 
 def test_migrate_schema_failure(mock_pg_client, mock_ob_client, converter):

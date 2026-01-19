@@ -4,28 +4,32 @@ set -euo pipefail
 # obloader 4.3.4 CLI 模板
 # 说明：字段与参数来自 obloader 4.3.4 --help，请按实际环境调整。
 
-OB_HOST="your_oceanbase_host"
-OB_PORT="2881"
-OB_USER="root@tenant"
-OB_TENANT="tenant"
-OB_CLUSTER="obcluster"
-OB_DB="your_database"
-OB_PASSWORD="your_password"
+export OB_LOADER_PATH="/data/ob-loader-dumper"
 
-DATA_DIR="/path/to/csv_files"
+
+OB_HOST="183.6.70.7"
+OB_PORT="2881"
+OB_USER="root@test"
+OB_TENANT="test"
+OB_CLUSTER="obcluster"
+OB_DB="test"
+OB_PASSWORD="kwaidoo123"
+
+
+
+DATA_DIR="./export"
 FILE_SUFFIX=".csv"
 
-obloader \
+$OB_LOADER_PATH/bin/obloader \
   -h "${OB_HOST}" \
   -P "${OB_PORT}" \
   -u "${OB_USER}" \
   -t "${OB_TENANT}" \
-  -c "${OB_CLUSTER}" \
   -p "${OB_PASSWORD}" \
   -D "${OB_DB}" \
   --csv \
   --file-encoding="UTF-8" \
-  --character-set="utf8mb4" \
+  --character-set="utf8" \
   --column-separator=',' \
   --line-separator=$'\n' \
   --null-string="\\N" \
@@ -34,6 +38,9 @@ obloader \
   --file-suffix="${FILE_SUFFIX}" \
   --thread=8 \
   -f "${DATA_DIR}"
+  --replace-data
+  --all
+
 
 # 覆盖/替换策略：
 # 1) replace（按主键覆盖）
